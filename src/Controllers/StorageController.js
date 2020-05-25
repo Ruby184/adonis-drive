@@ -1,11 +1,14 @@
 'use strict'
 
+const contentDisposition = require('content-disposition')
 const { pipeline } = require('stream')
+const { extname } = require('path')
 
 class StorageController {
   async download ({ $disk, params, request, response }) {
     const path = params.path.join('/')
     const stat = await $disk.stat(path)
+    const filename = request.input('filename')
 
     response.header('Last-Modified', stat.modified.toUTCString())
     response.header('Content-Type', stat.mimetype)
