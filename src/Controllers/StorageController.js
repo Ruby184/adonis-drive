@@ -12,6 +12,13 @@ class StorageController {
     response.header('Etag', stat.etag)
     response.header('Accept-Ranges', 'bytes')
 
+    if (filename) {
+      response.header('Content-Disposition', contentDisposition(
+        `${filename}${extname(path)}`,
+        { type: 'attachment' })
+      )
+    }
+
     if (request.method() === 'HEAD') {
       return response.status(request.fresh() ? 304 : 200).send('')
     }
@@ -27,7 +34,7 @@ class StorageController {
       const parts = range.replace(/bytes=/, '').split('-')
       let start = parseInt(parts[0], 10)
       let end = parseInt(parts[1], 10)
-  
+
       if (isNaN(start)) {
         start = stat.size - end
         end = stat.size - 1
