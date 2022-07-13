@@ -260,7 +260,7 @@ class AwsS3 {
 
       this.s3.copyObject(clonedParams, (err) => {
         if (err) {
-          return reject(this._handleError(err, location))
+          return reject(this._handleError(err, src))
         }
 
         return resolve(this.getUrl(dest))
