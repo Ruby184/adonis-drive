@@ -33,7 +33,7 @@ class DriveProvider extends ServiceProvider {
     this.$registerControllers()
   }
 
-  boot () {
+  async boot () {
     const Drive = this.app.use('Adonis/Addons/Drive')
     const { BriskRoute } = this.app.use('Adonis/Src/Route')
 
@@ -49,12 +49,28 @@ class DriveProvider extends ServiceProvider {
       })
     })
 
+    BriskRoute.macro('signedUpload', function (disk) {
+      return this.setHandler(
+        '@provider:Adonis/Addons/Drive/Controllers/StorageController.upload',
+        ['POST']
+      ).middleware(async (ctx, next) => {
+        ctx.$disk = Drive.disk(disk)
+        return next()
+      })
+    })
+
     try {
       const uploadFiles = require('../src/Bindings/Request')
+      const { fileTypeFromBuffer } = await import('file-type')
       const Request = this.app.use('Adonis/Src/Request')
 
       Request.macro('upload', function (files, disk = '') {
-        return uploadFiles(this, Drive.disk(disk), files)
+        return uploadFiles(
+          this,
+          typeof disk === 'string' ? Drive.disk(disk) : disk,
+          Array.isArray(files) ? files : [files],
+          fileTypeFromBuffer
+        )
       })
     } catch (e) {}
   }

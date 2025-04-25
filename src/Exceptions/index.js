@@ -35,6 +35,10 @@ class InvalidConfig extends GE.RuntimeException {
   static missingDiskDriver (name) {
     return new this(`Make sure to define driver for ${name} disk`, 500, 'E_INVALID_CONFIG')
   }
+
+  static missingConfigOption (option) {
+    return new this(`Make sure to define disk config option "${option}".`, 500, 'E_INVALID_CONFIG')
+  }
 }
 
 class MethodNotSupported extends GE.RuntimeException {
@@ -45,6 +49,20 @@ class MethodNotSupported extends GE.RuntimeException {
     exception.driver = driver
 
     return exception
+  }
+}
+
+class InvalidSignedUpload extends GE.RuntimeException {
+  static missingField (field) {
+    return new this(`Invalid or missing field ${field}.`, 400, 'E_INVALID_SIGNED_UPLOAD')
+  }
+
+  static invalidSignature () {
+    return new this(`Invalid signature for upload policy.`, 400, 'E_INVALID_SIGNED_UPLOAD')
+  }
+
+  static requestExpired () {
+    return new this(`Signed upload is already expired.`, 400, 'E_INVALID_SIGNED_UPLOAD')
   }
 }
 
@@ -77,4 +95,5 @@ module.exports = {
   MethodNotSupported,
   PermissionMissing,
   UnknownException,
+  InvalidSignedUpload,
 }

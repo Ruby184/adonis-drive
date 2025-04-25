@@ -5,9 +5,10 @@ const path = require('path')
 const PCancelable = require('p-cancelable')
 const { pipeline } = require('stream')
 const mime = require('mime-types')
+const { createHmac, timingSafeEqual } = require('crypto')
 const {
-  FileNotFound, PermissionMissing,
-  UnknownException, MethodNotSupported
+  FileNotFound, PermissionMissing, InvalidConfig,
+  UnknownException, MethodNotSupported, InvalidSignedUpload
 } = require('../Exceptions')
 
 function isReadableStream (stream) {
@@ -60,6 +61,7 @@ class LocalFileSystem {
   constructor (config) {
     this.root = config.root
     this._url = config.url
+    this._signedUpload = config.signedUpload
   }
 
   _handleError (err, path) {
@@ -116,7 +118,81 @@ class LocalFileSystem {
 
   async getSignedUrl (location, { expiry = 900, ...params } = {}) {
     return this.getUrl(location)
-  }  
+  }
+
+  _computeHMACSignature (payload) {
+    if (!this._signedUpload || !this._signedUpload.secret) {
+      throw InvalidConfig.missingConfigOption('signedUpload.secret')
+    }
+
+    return createHmac('sha256', this._signedUpload.secret).update(payload, 'utf8').digest('hex')
+  }
+
+  _getSignedUploadUrl () {
+    if (!this._signedUpload || !this._signedUpload.url) {
+      throw InvalidConfig.missingConfigOption('signedUpload.url')
+    }
+
+    const url = typeof this._signedUpload.url === 'function' ? this._signedUpload.url() : this._signedUpload.url
+
+    if (url instanceof URL) {
+      return url.href
+    }
+
+    return url
+  }
+
+  async getSignedUpload (location, { expiry = 900, size = 5242880, type } = {}) {
+    const url = this._getSignedUploadUrl()
+    const now = Math.floor(Date.now() / 1000)
+
+    const conditions = {
+      key: location,
+      iat: now,
+      exp: now + expiry,
+      size,
+      type,
+    }
+
+    const policy = Buffer.from(JSON.stringify(conditions), 'utf8').toString('base64')
+
+    const fields = {
+      policy,
+      signature: this._computeHMACSignature(policy),
+    }
+
+    return { fields, url }
+  }
+
+  validateSignedUpload (fields) {
+    for (const field of ['policy', 'signature']) {
+      if (typeof fields[field] !== 'string') {
+        throw InvalidSignedUpload.missingField(field)
+      }
+    }
+
+    const receivedSignature = fields.signature
+    const expectedSignature = this._computeHMACSignature(fields.policy)
+
+    if (expectedSignature.length !== receivedSignature.length) {
+      throw InvalidSignedUpload.invalidSignature()
+    }
+
+    const textEncoder = new TextEncoder()
+
+    if (!timingSafeEqual(textEncoder.encode(expectedSignature), textEncoder.encode(receivedSignature))) {
+      throw InvalidSignedUpload.invalidSignature()
+    }
+
+    const policy = JSON.parse(Buffer.from(fields.policy, 'base64').toString('utf8'))
+    const now = Math.floor(Date.now() / 1000)
+
+    if (now > policy.exp) {
+      throw InvalidSignedUpload.requestExpired()
+    }
+
+    return policy
+  }
   
   async stat (location) {
     try {

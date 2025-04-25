@@ -30,8 +30,10 @@
   "license": "MIT",
   "dependencies": {
     "@adonisjs/generic-exceptions": "^3.0.1",
-    "content-disposition": "^0.5.3",
-    "image-size": "^0.8.3",
+    "content-disposition": "^0.5.4",
+    "file-type": "^20.4.1",
+    "image-size": "^2.0.2",
+    "media-typer": "^1.1.0",
     "p-cancelable": "^2.0.0"
   },
   "devDependencies": {

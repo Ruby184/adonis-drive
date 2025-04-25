@@ -3,7 +3,7 @@
 const S3 = require('aws-sdk/clients/s3')
 const CloudFront = require('aws-sdk/clients/cloudfront')
 const PCancelable = require('p-cancelable')
-const { FileNotFound, UnknownException } = require('../Exceptions')
+const { FileNotFound, UnknownException, MethodNotSupported } = require('../Exceptions')
 const { URL } = require('url')
 
 class AwsS3 {
@@ -248,6 +248,52 @@ class AwsS3 {
     }
 
     return this.getS3SignedUrl(location, expiry, params)
+  }
+
+  getSignedUploadUrl (location, { expiry = 900, ...params } = {}) {
+    return new Promise((resolve, reject) => {
+      const clonedParams = Object.assign({}, params, {
+        Key: location,
+        Bucket: this._bucket,
+        Expires: expiry
+      })
+
+      this.s3.getSignedUrl('putObject', clonedParams, (err, url) => {
+        if (err) {
+          return reject(this._handleError(err, location))
+        }
+
+        return resolve(url)
+      })
+    })
+  }
+
+  getSignedUpload (location, { expiry = 900, size = 5242880, type } = {}) {
+    return new Promise((resolve, reject) => {
+      const params = {
+        Fields: {
+          key: location,
+        },
+        Bucket: this._bucket,
+        Expires: expiry,
+        Conditions: [
+          ['content-length-range', 0, size],
+          ['eq', '$Content-Type', type],
+        ]
+      }
+
+      this.s3.createPresignedPost(params, (err, data) => {
+        if (err) {
+          return reject(this._handleError(err, location))
+        }
+
+        return resolve(data)
+      })
+    })
+  }
+
+  validateSignedUpload () {
+    throw MethodNotSupported.method('validateSignedUpload', 's3')
   }
 
   copy (src, dest, params = {}) {

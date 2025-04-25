@@ -80,6 +80,35 @@ class StorageController {
       })
     })
   }
+
+  async upload ({ $disk, request, response }) {
+    try {
+      await request.upload(
+        {
+          name: 'file',
+          validate: ({ fields }) => {
+            const { key, size, type } = $disk.validateSignedUpload(fields)
+
+            return {
+              types: type.split('/'),
+              size,
+              extnames: [extname(key).replace(/^\./, '')],
+              location: key,
+            }
+          },
+        },
+        $disk
+      )
+
+      return response.status(204).send('')
+    } catch (error) {
+      if (error.type) {
+        return response.status(400).send(error)
+      }
+
+      throw error
+    }
+  }
 }
 
 module.exports = StorageController
