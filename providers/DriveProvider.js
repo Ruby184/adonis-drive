@@ -61,7 +61,7 @@ class DriveProvider extends ServiceProvider {
 
     try {
       const uploadFiles = require('../src/Bindings/Request')
-      const { fileTypeFromBuffer } = await import('file-type')
+      const { fileTypeFromBuffer } = await import('file-type/core')
       const Request = this.app.use('Adonis/Src/Request')
 
       Request.macro('upload', function (files, disk = '') {
