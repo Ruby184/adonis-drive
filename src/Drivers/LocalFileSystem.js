@@ -1,11 +1,12 @@
 'use strict'
 
-const fs = require('fs-extra')
-const path = require('path')
+const fsPromises = require('node:fs/promises')
+const fs = require('node:fs')
+const path = require('node:path')
+const { createHmac, timingSafeEqual } = require('node:crypto')
 const PCancelable = require('p-cancelable')
-const { pipeline } = require('stream')
+const { pipeline, Stream } = require('node:stream')
 const mime = require('mime-types')
-const { createHmac, timingSafeEqual } = require('crypto')
 const {
   FileNotFound, PermissionMissing, InvalidConfig,
   UnknownException, MethodNotSupported, InvalidSignedUpload
@@ -13,48 +14,36 @@ const {
 
 function isReadableStream (stream) {
   return stream !== null
-    && typeof (stream) === 'object'
-    && typeof (stream.pipe) === 'function'
-    && typeof (stream._read) === 'function'
-    && typeof (stream._readableState) === 'object'
+    && stream instanceof Stream
+    && typeof stream._read === 'function'
     && stream.readable !== false
 }
 
-function createWriteStream (file, options = {}) {
-  // if fd is set with an actual number, file is created, hence directory is too
+function createWriteStream(file, options = {}) {
+  // If fd is already provided, the directory must already exist
   if (options.fd) {
     return fs.createWriteStream(file, options)
-  } else {
-    // this hacks the WriteStream constructor from calling open()
-    options.fd = -1
   }
-  
-  let dirExists = false
+
   const dir = path.dirname(file)
   const _fs = options.fs || fs
-  const ws = new _fs.WriteStream(file, options)
-  const oldOpen = ws.open
-  
-  ws.open = function () {
-    // set actual fd
-    ws.fd = null
 
-    if (dirExists) {
-      return oldOpen.call(ws)
-    }
+  const customFs = {
+    ..._fs,
+    open: (...args) => {
+      const callback = args.pop()
 
-    // this only runs once on first write
-    fs.ensureDir(dir).then(() => {
-      dirExists = true
-      oldOpen.call(ws)
-    }).catch((err) => {
-      ws.destroy(err)
-    })
+      _fs.mkdir(dir, { recursive: true }, (err) => {
+        if (err) {
+          return callback(err)
+        }
+
+        _fs.open(...args, callback)
+      })
+    },
   }
 
-  ws.open()
-
-  return ws
+  return fs.createWriteStream(file, { ...options, fs: customFs })
 }
 
 class LocalFileSystem {
@@ -80,7 +69,7 @@ class LocalFileSystem {
   }
 
   driver () {
-		return fs
+		return fsPromises
   }
   
   upload (location, stream, options = {}) {
@@ -196,7 +185,7 @@ class LocalFileSystem {
   
   async stat (location) {
     try {
-			const stat = await fs.stat(this._fullPath(location))
+			const stat = await fsPromises.stat(this._fullPath(location))
 
       return {
         size: stat.size,
@@ -211,7 +200,7 @@ class LocalFileSystem {
 
   async *list (location, recursive = false) {
     try {
-      const dirents = await fs.readdir(this._fullPath(location), { withFileTypes: true })
+      const dirents = await fsPromises.readdir(this._fullPath(location), { withFileTypes: true })
 
       for (const dirent of dirents) {
         const res = {
@@ -230,13 +219,13 @@ class LocalFileSystem {
     }
   }
 
-  exists (location) {
-    return fs.pathExists(this._fullPath(location))
+  async exists (location) {
+    return fsPromises.access(this._fullPath(location), fs.constants.F_OK).then(() => true).catch(() => false)
   }
 
   async get (location, options = {}) {
     try {
-      return await fs.readFile(this._fullPath(location), options)
+      return await fsPromises.readFile(this._fullPath(location), options)
     } catch (err) {
       throw this._handleError(err, location)
     }
@@ -261,25 +250,25 @@ class LocalFileSystem {
       })
     }
 
-    await fs.outputFile(this._fullPath(location), content, options)
+    await fsPromises.writeFile(this._fullPath(location), content, options)
 
     return true
   }
 
   async delete (location) {
-    await fs.remove(this._fullPath(location))
+    await fsPromises.unlink(this._fullPath(location))
 
     return true
   }
 
   async move (src, dest, options = {}) {
-    await fs.move(this._fullPath(src), this._fullPath(dest), options)
+    await fsPromises.rename(this._fullPath(src), this._fullPath(dest), options)
 
     return true
   }
 
   async copy (src, dest, options) {
-    await fs.copy(this._fullPath(src), this._fullPath(dest), options)
+    await fsPromises.copyFile(this._fullPath(src), this._fullPath(dest), options)
 
     return true
   }
