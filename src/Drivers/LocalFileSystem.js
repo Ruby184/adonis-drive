@@ -261,8 +261,8 @@ class LocalFileSystem {
     return true
   }
 
-  async move (src, dest, options = {}) {
-    await fsPromises.rename(this._fullPath(src), this._fullPath(dest), options)
+  async move (src, dest) {
+    await fsPromises.rename(this._fullPath(src), this._fullPath(dest))
 
     return true
   }
