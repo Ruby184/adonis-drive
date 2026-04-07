@@ -267,8 +267,8 @@ class LocalFileSystem {
     return true
   }
 
-  async copy (src, dest, options) {
-    await fsPromises.copyFile(this._fullPath(src), this._fullPath(dest), options)
+  async copy (src, dest) {
+    await fsPromises.copyFile(this._fullPath(src), this._fullPath(dest))
 
     return true
   }
