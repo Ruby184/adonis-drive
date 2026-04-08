@@ -16,7 +16,7 @@ class FileNotFound extends GE.RuntimeException {
   static file (err, path) {
     const exception = new this(`The file "${path}" doesn't exist`, 404, 'E_FILE_NOT_FOUND')
 
-    exception.raw = err
+    exception.cause = err
     exception.file = path
 
     return exception
@@ -70,7 +70,7 @@ class UnknownException extends GE.RuntimeException {
   static invoke (err, code, path) {
     const exception = new this(`An unknown error happened with the file ${path}. Error code: ${code}`, 500, 'E_UNKNOWN')
 
-    exception.raw = err
+    exception.cause = err
     exception.file = path
 
     return exception
@@ -81,7 +81,7 @@ class PermissionMissing extends GE.RuntimeException {
   static invoke (err, path) {
     const exception = new this(`Missing permission for file ${path}\n${err.message}`, 500, 'E_PERMISSION_MISSING')
 
-    exception.raw = err
+    exception.cause = err
     exception.file = path
 
     return exception 

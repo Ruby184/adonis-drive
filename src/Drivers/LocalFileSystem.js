@@ -68,6 +68,12 @@ class LocalFileSystem {
     return path.isAbsolute(relativePath) ? relativePath : path.join(this.root, relativePath)
   }
 
+  async _ensureDestination (dest) {
+    const destinationPath = this._fullPath(dest)
+    await fsPromises.mkdir(path.dirname(destinationPath), { recursive: true })
+    return destinationPath
+  }
+
   driver () {
 		return fsPromises
   }
@@ -232,7 +238,11 @@ class LocalFileSystem {
   }
 
   getStream (location, options) {
-    return fs.createReadStream(this._fullPath(location), options)
+    try {
+      return fs.createReadStream(this._fullPath(location), options)
+    } catch (err) {
+      throw this._handleError(err, location)
+    }
   }
 
   async put (location, content, options = {}) {
@@ -250,27 +260,39 @@ class LocalFileSystem {
       })
     }
 
-    await fsPromises.writeFile(this._fullPath(location), content, options)
-
-    return true
+    try {
+      await fsPromises.writeFile(await this._ensureDestination(location), content, options)
+      return true
+    } catch (err) {
+      throw this._handleError(err, location)
+    }
   }
 
   async delete (location) {
-    await fsPromises.unlink(this._fullPath(location))
-
-    return true
+    try {
+      await fsPromises.unlink(this._fullPath(location))
+      return true
+    } catch (err) {
+      throw this._handleError(err, location)
+    }
   }
 
   async move (src, dest) {
-    await fsPromises.rename(this._fullPath(src), this._fullPath(dest))
-
-    return true
+    try {
+      await fsPromises.rename(this._fullPath(src), await this._ensureDestination(dest))
+      return true
+    } catch (err) {
+      throw this._handleError(err, src)
+    }
   }
 
   async copy (src, dest) {
-    await fsPromises.copyFile(this._fullPath(src), this._fullPath(dest))
-
-    return true
+    try {
+      await fsPromises.copyFile(this._fullPath(src), await this._ensureDestination(dest))
+      return true
+    } catch (err) {
+      throw this._handleError(err, src)
+    }
   }
 }
 
