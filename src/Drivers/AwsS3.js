@@ -3,6 +3,7 @@
 const S3 = require('aws-sdk/clients/s3')
 const CloudFront = require('aws-sdk/clients/cloudfront')
 const PCancelable = require('p-cancelable')
+const { pipeline, Stream, PassThrough } = require('node:stream')
 const { FileNotFound, UnknownException, MethodNotSupported } = require('../Exceptions')
 const { URL } = require('url')
 
@@ -33,6 +34,23 @@ class AwsS3 {
     }
   }
 
+  _convertBody (body) {
+    if (Buffer.isBuffer(body) || body instanceof Stream) {
+      return body
+    }
+
+    if (body !== null && typeof body === 'object' && typeof body.pipe === 'function') {
+      // convert not official readable stream to nodejs stream
+      return pipeline(body, new PassThrough(), () => {})
+    }
+
+    if (typeof body === 'string') {
+      return Buffer.from(body)
+    }
+
+    return body
+  }
+
   driver () {
     return this.s3
   }
@@ -41,7 +59,7 @@ class AwsS3 {
     return new PCancelable((resolve, reject, onCancel) => {
       const clonedParams = Object.assign({}, params, {
         Key: location,
-        Body: stream,
+        Body: this._convertBody(stream),
         Bucket: this._bucket,
       })
 
@@ -142,7 +160,7 @@ class AwsS3 {
     return new Promise((resolve, reject) => {
       const clonedParams = Object.assign({}, params, {
         Key: location,
-        Body: content,
+        Body: this._convertBody(content),
         Bucket: this._bucket,
       })
 
