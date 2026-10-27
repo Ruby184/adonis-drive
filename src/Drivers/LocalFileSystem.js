@@ -270,7 +270,8 @@ class LocalFileSystem {
 
   async delete (location) {
     try {
-      await fsPromises.unlink(this._fullPath(location))
+      // same as fs-extra remove, directories are removed with their content and a missing path is not an error
+      await fsPromises.rm(this._fullPath(location), { recursive: true, force: true })
       return true
     } catch (err) {
       throw this._handleError(err, location)
